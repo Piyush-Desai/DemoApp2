@@ -1,0 +1,133 @@
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+
+class BottomBarTab {
+  final WidgetBuilder routePageBuilder;
+  final WidgetBuilder initPageBuilder;
+  final WidgetBuilder tabIconBuilder;
+  final WidgetBuilder tabTitleBuilder;
+  final GlobalKey<NavigatorState> _navigatorKey;
+
+  BottomBarTab({
+    required this.initPageBuilder,
+    required this.tabIconBuilder,
+    required this.tabTitleBuilder,
+    required this.routePageBuilder,
+    required GlobalKey<NavigatorState> navigatorKey,
+  }) : _navigatorKey = navigatorKey;
+}
+
+class MultiNavigatorBottomBar extends StatefulWidget {
+  final int initTabIndex;
+  final List<BottomBarTab> tabs;
+  final PageRoute pageRoute;
+  final ValueChanged<int> onTap;
+  final Widget Function(Widget) pageWidgetDecorator;
+  final BottomNavigationBarType type;
+  final Color fixedColor;
+  final Color backgroundColor;
+  final double iconSize;
+  final ValueGetter shouldHandlePop;
+
+  const MultiNavigatorBottomBar({Key? key,
+    required this.initTabIndex,
+    required this.tabs,
+    required this.onTap,
+    required this.pageRoute,
+    required this.pageWidgetDecorator,
+    required this.type,
+    required this.fixedColor,
+    this.iconSize = 24.0,
+    this.shouldHandlePop = _defaultShouldHandlePop, required this.backgroundColor,
+  }) : super(key: key);
+
+  static bool _defaultShouldHandlePop() => true;
+
+  @override
+  State<StatefulWidget> createState() =>
+      _MultiNavigatorBottomBarState(initTabIndex);
+}
+
+class _MultiNavigatorBottomBarState extends State<MultiNavigatorBottomBar> {
+  int currentIndex;
+
+  _MultiNavigatorBottomBarState(this.currentIndex);
+
+  @override
+  Widget build(BuildContext context) => WillPopScope(
+    onWillPop: () async {
+      return widget.shouldHandlePop() ? !await widget
+          .tabs[currentIndex]._navigatorKey.currentState!
+          .maybePop() : false;
+    },
+    child: Scaffold(
+      body: widget.pageWidgetDecorator == null
+          ? _buildPageBody()
+          : widget.pageWidgetDecorator(_buildPageBody()),
+      bottomNavigationBar: _buildBottomBar(),
+    ),
+  );
+
+  Widget _buildPageBody() => Stack(
+    children:
+    widget.tabs.map((tab) => _buildOffstageNavigator(tab)).toList(),
+  );
+
+  Widget _buildOffstageNavigator(BottomBarTab tab) => Offstage(
+    offstage: widget.tabs.indexOf(tab) != currentIndex,
+    child: TabPageNavigator(
+      navigatorKey: tab._navigatorKey,
+      initPageBuilder: tab.initPageBuilder,
+      pageRoute: widget.pageRoute,
+    ),
+  );
+
+  Widget _buildBottomBar() => Theme(
+    data: ThemeData(
+      splashColor: Colors.transparent,
+      focusColor: Colors.transparent,
+      hoverColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+
+    ),
+    child: BottomNavigationBar(
+      type: widget.type,
+      elevation: 3.0,
+      fixedColor: widget.fixedColor,
+      backgroundColor: widget.backgroundColor,
+      items: widget.tabs
+          .map((tab) => BottomNavigationBarItem(
+        icon: tab.tabIconBuilder(context),
+        title: const Text("", style: TextStyle(fontSize: 0.0),),
+      ))
+          .toList(),
+      onTap: (index) {
+        if (widget.onTap != null) widget.onTap(index);
+        setState(() => currentIndex = index);
+      },
+      currentIndex: currentIndex,
+    ),
+  );
+}
+
+class TabPageNavigator extends StatelessWidget {
+  TabPageNavigator(
+      {required this.navigatorKey,
+        required this.initPageBuilder,
+        required this.pageRoute});
+
+  final GlobalKey<NavigatorState> navigatorKey;
+  final WidgetBuilder initPageBuilder;
+  final PageRoute pageRoute;
+
+  @override
+  Widget build(BuildContext context) => Navigator(
+    key: navigatorKey,
+    observers: [HeroController()],
+    onGenerateRoute: (routeSettings) =>
+    pageRoute,
+  );
+
+  WidgetBuilder _defaultPageRouteBuilder(String routName, {required String heroTag}) =>
+          (context) => initPageBuilder(context);
+}
